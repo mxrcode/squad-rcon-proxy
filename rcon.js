@@ -1,4 +1,3 @@
-// rcon.js
 import EventEmitter from 'events';
 import net from 'net';
 import util from 'util';
@@ -207,11 +206,7 @@ export default class Rcon extends EventEmitter {
   onClose(hadError) {
     this.connected = false;
     this.loggedin = false;
-    logger(
-      'RCON',
-      1,
-      `Socket closed ${hadError ? 'with' : 'without'} an error. ${hadError}`
-    );
+    logger('RCON', 1, `Socket closed ${hadError ? 'with' : 'without'} an error. ${hadError}`);
 
     // Cleanup all local state onClose
     if (this.incomingData.length > 0) {
@@ -242,7 +237,7 @@ export default class Rcon extends EventEmitter {
   }
 
   onError(err) {
-    logger('RCON', 1, `Socket had error:`, err);
+    logger('RCON', 1, `Socket had error: ${err}`);
     this.emit('RCON_ERROR', err);
   }
 
@@ -273,7 +268,11 @@ export default class Rcon extends EventEmitter {
 
         logger('RCON', 1, `Failed to connect to: ${this.host}:${this.port}`, err);
 
-        reject(err);
+        this.handleConnectionRefused(err);
+
+        setTimeout(() => {
+          this.connect().then(resolve).catch(reject);
+        }, this.autoReconnectDelay);
       };
 
       this.client.once('connect', onConnect);
@@ -281,6 +280,15 @@ export default class Rcon extends EventEmitter {
 
       this.client.connect(this.port, this.host);
     });
+  }
+
+  handleConnectionRefused(err) {
+    if (err.code === 'ECONNREFUSED') {
+      logger('RCON', 1, `Connection refused. Retrying in ${this.autoReconnectDelay}ms...`);
+    } else {
+      logger('RCON', 1, `Error connecting to RCON: ${err}`);
+      this.emit('RCON_ERROR', err);
+    }
   }
 
   disconnect() {
