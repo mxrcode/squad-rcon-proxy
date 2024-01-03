@@ -1,6 +1,6 @@
 {
   "name": "squad-rcon-proxy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "RCON Web Proxy for Squad",
   "main": "index.js",
   "type": "module",
