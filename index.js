@@ -21,7 +21,7 @@ const authenticateMiddleware = (req, res, next) => {
   }
 };
 
-app.use(express.text());
+app.use(express.text({ defaultCharset: 'utf-8' }));
 
 app.post('/rcon', authenticateMiddleware, async (req, res) => {
   const command = req.body;
