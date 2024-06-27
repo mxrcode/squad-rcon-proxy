@@ -11,6 +11,13 @@ const rconOptions = {
     password: 'RCON_PASSWORD',
 };
 
-export const enableLogging = true;
+function logger(component, level, message) {
+    if (level <= LOG_LEVEL) {
+      console.log(`[${level}] [${component}] ${message}`);
+    }
+}
 
-export { webOptions, rconOptions };
+const LOG_LEVEL = 1;
+const enableLogging = true;
+
+export { enableLogging, webOptions, rconOptions, LOG_LEVEL, logger };
