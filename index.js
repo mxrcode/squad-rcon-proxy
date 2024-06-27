@@ -1,13 +1,17 @@
 import Rcon from './rcon.js';
 import express from 'express';
 
-import { webOptions, rconOptions } from './config.js';
+import { webOptions, rconOptions, enableLogging, LOG_LEVEL, logger } from './config.js';
 
 const app = express();
 
 // Middleware for logging HTTP requests
 app.use((req, res, next) => {
-  console.log(`[HTTP] ${req.method} request to ${req.path} from ${req.ip}`);
+  logger(
+    'HTTP',
+    1,
+    `${req.method} request to ${req.path} from ${req.ip}`
+  );
   next();
 });
 
@@ -18,6 +22,11 @@ const authenticateMiddleware = (req, res, next) => {
     next();
   } else {
     res.status(401).send('Unauthorized');
+    logger(
+      'HTTP',
+      1,
+      `Unauthorized request from ${req.ip}`
+    );
   }
 };
 
@@ -35,16 +44,28 @@ app.post('/rcon', authenticateMiddleware, async (req, res) => {
 });
 
 const server = app.listen(webOptions.port_web, webOptions.ip_web, () => {
-  console.log(`[HTTP] HTTP server listening on ${webOptions.ip_web}:${webOptions.port_web}`);
+  logger(
+    'HTTP',
+    0,
+    `HTTP server listening on ${webOptions.ip_web}:${webOptions.port_web}`
+  );
 });
 
 // Add an event listener to close the RCON connection when the HTTP server is stopped
 server.on('close', async () => {
   try {
     await rconInstance.disconnect();
-    console.log('[RCON] RCON disconnected');
+    logger(
+      'RCON',
+      0,
+      `RCON disconnected`
+    );
   } catch (error) {
-    console.error('[RCON] Error disconnecting from RCON:', error);
+    logger(
+      'RCON',
+      0,
+      `Error disconnecting from RCON: ${error}`
+    );
   }
 });
 
@@ -52,10 +73,18 @@ const rconInstance = new Rcon(rconOptions);
 
 rconInstance.connect()
   .then(() => {
-    console.log('[RCON] Connected to RCON');
+    logger(
+      'RCON',
+      0,
+      `Connected to RCON`
+    );
 
     // You can now use rconInstance to send commands, e.g., rconInstance.execute('your_command');
   })
   .catch((error) => {
-    console.error('[RCON] Error connecting to RCON:', error);
+    logger(
+      'RCON',
+      0,
+      `Error connecting to RCON: ${error}`
+    );
   });
