@@ -19,7 +19,7 @@ if (enableLogging) {
   const logStream = createWriteStream(logFilePath, { flags: 'a' });
   
   console.log = message => {
-    const formattedMessage = `[${new Date().toISOString()}] ${message}`;
+    const formattedMessage = `${message}`;
     process.stdout.write(formattedMessage + '\n');
     logStream.write(formattedMessage + '\n');
   };

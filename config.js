@@ -13,11 +13,11 @@ const rconOptions = {
 
 function logger(component, level, message) {
     if (level <= LOG_LEVEL) {
-      console.log(`[${level}] [${component}] ${message}`);
+      console.log(`[${new Date().toISOString()}] [${level}] [${component}] ${message}`);
     }
 }
 
-const LOG_LEVEL = 1;
+const LOG_LEVEL = 0;
 const enableLogging = true;
 
 export { enableLogging, webOptions, rconOptions, LOG_LEVEL, logger };
