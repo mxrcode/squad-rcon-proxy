@@ -5,7 +5,9 @@ import { createWriteStream } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { enableLogging } from './config.js';
+import { enableLogging, LOG_LEVEL, logger } from './config.js';
+
+EventEmitter.defaultMaxListeners = 100; // Increase the default max listeners to prevent memory leaks
 
 if (enableLogging) {
   const __filename = fileURLToPath(import.meta.url);
@@ -21,10 +23,6 @@ if (enableLogging) {
     process.stdout.write(formattedMessage + '\n');
     logStream.write(formattedMessage + '\n');
   };
-}
-
-function logger (level, component, message) {
-    console.log(`[${level}] [${component}] ${message}`);
 }
 
 const SERVERDATA_EXECCOMMAND = 0x02;
@@ -83,9 +81,10 @@ export default class Rcon extends EventEmitter {
   onPacket(decodedPacket) {
     // the logic in this method simply splits data sent via the data event into packets regardless of how they're
     // distributed in the event calls
+    
     logger(
       'RCON',
-      2,
+      3,
       `Processing decoded packet: ${this.decodedPacketToString(decodedPacket)}`
     );
 
