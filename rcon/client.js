@@ -5,7 +5,7 @@ import { createWriteStream } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { enableLogging, LOG_LEVEL, logger } from './config.js';
+import { enableLogging, LOG_LEVEL, logger } from '../config.js';
 
 EventEmitter.defaultMaxListeners = 100; // Increase the default max listeners to prevent memory leaks
 
