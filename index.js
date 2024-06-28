@@ -1,7 +1,7 @@
 import Rcon from './rcon.js';
 import express from 'express';
 
-import { webOptions, rconOptions, enableLogging, LOG_LEVEL, logger } from './config.js';
+import { POOL_SIZE, webOptions, rconOptions, enableLogging, LOG_LEVEL, logger } from './config.js';
 
 const app = express();
 
@@ -32,8 +32,35 @@ const authenticateMiddleware = (req, res, next) => {
 
 app.use(express.text({ defaultCharset: 'utf-8' }));
 
+// Create pool connection
+const rconPool = [];
+const poolSize = POOL_SIZE;
+let currentRconIndex = 0;
+
+for (let i = 0; i < poolSize; i++) {
+  const rconInstance = new Rcon(rconOptions);
+  rconInstance.connect().then(() => {
+    logger(
+      'RCON',
+      0,
+      `Connected to RCON instance ${i}`
+    );
+  }).catch((error) => {
+    logger(
+      'RCON',
+      0,
+      `Error connecting to RCON instance ${i}: ${error}`
+    );
+  });
+  rconPool.push(rconInstance);
+}
+
 app.post('/rcon', authenticateMiddleware, async (req, res) => {
   const command = req.body;
+
+  // Get the next RCON instance from the pool
+  const rconInstance = rconPool[currentRconIndex];
+  currentRconIndex = (currentRconIndex + 1) % rconPool.length;
 
   try {
     const response = await rconInstance.execute(command);
@@ -51,40 +78,22 @@ const server = app.listen(webOptions.port_web, webOptions.ip_web, () => {
   );
 });
 
-// Add an event listener to close the RCON connection when the HTTP server is stopped
+// Add an event listener to close the RCON connections when the HTTP server is stopped
 server.on('close', async () => {
-  try {
-    await rconInstance.disconnect();
-    logger(
-      'RCON',
-      0,
-      `RCON disconnected`
-    );
-  } catch (error) {
-    logger(
-      'RCON',
-      0,
-      `Error disconnecting from RCON: ${error}`
-    );
+  for (let i = 0; i < rconPool.length; i++) {
+    try {
+      await rconPool[i].disconnect();
+      logger(
+        'RCON',
+        0,
+        `RCON instance ${i} disconnected`
+      );
+    } catch (error) {
+      logger(
+        'RCON',
+        0,
+        `Error disconnecting RCON instance ${i}: ${error}`
+      );
+    }
   }
 });
-
-const rconInstance = new Rcon(rconOptions);
-
-rconInstance.connect()
-  .then(() => {
-    logger(
-      'RCON',
-      0,
-      `Connected to RCON`
-    );
-
-    // You can now use rconInstance to send commands, e.g., rconInstance.execute('your_command');
-  })
-  .catch((error) => {
-    logger(
-      'RCON',
-      0,
-      `Error connecting to RCON: ${error}`
-    );
-  });

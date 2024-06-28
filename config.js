@@ -17,7 +17,9 @@ function logger(component, level, message) {
     }
 }
 
+const POOL_SIZE = 10;
+
 const LOG_LEVEL = 0;
 const enableLogging = true;
 
-export { enableLogging, webOptions, rconOptions, LOG_LEVEL, logger };
+export { POOL_SIZE, enableLogging, webOptions, rconOptions, LOG_LEVEL, logger };
