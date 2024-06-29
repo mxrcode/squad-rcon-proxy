@@ -1,8 +1,8 @@
 // config.js
 import { createWriteStream } from 'fs';
-import { join } from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
+import { mkdirSync } from 'fs';
 
 const webOptions = {
   ip_web: '127.0.0.1',
@@ -31,8 +31,11 @@ if (ENABLE_LOGGING) {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
   
-  const logFileName = `./log/${new Date().toISOString().replace(/:/g, '-')}.log`;
-  const logFilePath = join(__dirname, logFileName);
+  const logDir = join(__dirname, './log');
+  mkdirSync(logDir, { recursive: true });
+
+  const logFileName = `${new Date().toISOString().replace(/:/g, '-')}.log`;
+  const logFilePath = join(logDir, logFileName);
   
   const logStream = createWriteStream(logFilePath, { flags: 'a' });
   
