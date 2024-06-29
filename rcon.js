@@ -1,29 +1,7 @@
 import EventEmitter from 'events';
 import net from 'net';
 import util from 'util';
-import { createWriteStream } from 'fs';
-import { join } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { enableLogging, LOG_LEVEL, logger } from './config.js';
-
-EventEmitter.defaultMaxListeners = 100; // Increase the default max listeners to prevent memory leaks
-
-if (enableLogging) {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  
-  const logFileName = `./log/${new Date().toISOString().replace(/:/g, '-')}.log`;
-  const logFilePath = join(__dirname, logFileName);
-  
-  const logStream = createWriteStream(logFilePath, { flags: 'a' });
-  
-  console.log = message => {
-    const formattedMessage = `${message}`;
-    process.stdout.write(formattedMessage + '\n');
-    logStream.write(formattedMessage + '\n');
-  };
-}
+import { logger } from './config.js';
 
 const SERVERDATA_EXECCOMMAND = 0x02;
 const SERVERDATA_RESPONSE_VALUE = 0x00;
@@ -392,10 +370,15 @@ export default class Rcon extends EventEmitter {
             // Called from onClose()
             reject(response);
           } else {
+            // logger(
+            //   'RCON',
+            //   2,
+            //   `Returning complete response: ${response.replace(/\r\n|\r|\n/g, '\\n')}`
+            // );
             logger(
               'RCON',
               2,
-              `Returning complete response: ${response.replace(/\r\n|\r|\n/g, '\\n')}`
+              `Returning complete response.`
             );
 
             resolve(response);
