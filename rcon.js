@@ -181,12 +181,7 @@ export default class Rcon extends EventEmitter {
 
   processChatPacket(decodedPacket) {}
 
-  onClose(hadError) {
-    this.connected = false;
-    this.loggedin = false;
-    logger('RCON', 1, `Socket closed ${hadError ? 'with' : 'without'} an error. ${hadError}`);
-
-    // Cleanup all local state onClose
+  cleanupState() {
     if (this.incomingData.length > 0) {
       logger('RCON', 2, `Clearing Buffered Data`);
       this.incomingData = Buffer.from([]);
@@ -197,20 +192,33 @@ export default class Rcon extends EventEmitter {
     }
     if (this.responseCallbackQueue.length > 0) {
       logger('RCON', 2, `Clearing Pending Callbacks`);
-
-      // Cleanup Pending Callbacks; We should maybe retry these on next connection
-      // However, depending on the reason we got disconnected it may be a while.
-      // IE, Squad server crash, Squad server shutdown for multiple minutes.
-
       while (this.responseCallbackQueue.length > 0) {
         this.responseCallbackQueue.shift()(new Error('RCON DISCONNECTED'));
       }
       this.callbackIds = [];
     }
+  }  
 
+  onClose(hadError) {
+    this.connected = false;
+    this.loggedin = false;
+    logger('RCON', 1, `Socket closed ${hadError ? 'with' : 'without'} an error. ${hadError}`);
+  
+    // Cleanup all local state onClose
+    this.cleanupState();
+  
     if (this.autoReconnect) {
       logger('RCON', 1, `Sleeping ${this.autoReconnectDelay}ms before reconnecting.`);
-      setTimeout(this.connect, this.autoReconnectDelay);
+      setTimeout(() => {
+        this.connect()
+          .then(() => {
+            logger('RCON', 1, 'Reconnected successfully.');
+            // Optionally, you can add logic here to resume operations or re-authenticate.
+          })
+          .catch((err) => {
+            logger('RCON', 1, 'Reconnection attempt failed:', err);
+          });
+      }, this.autoReconnectDelay);
     }
   }
 
@@ -221,6 +229,7 @@ export default class Rcon extends EventEmitter {
 
   connect() {
     return new Promise((resolve, reject) => {
+      this.autoReconnect = true;
       logger('RCON', 1, `Connecting to: ${this.host}:${this.port}`);
 
       const onConnect = async () => {
@@ -234,7 +243,6 @@ export default class Rcon extends EventEmitter {
           await this.write(SERVERDATA_AUTH, this.password);
 
           // connected and authed successfully
-          this.autoReconnect = true;
           resolve();
         } catch (err) {
           reject(err);
@@ -246,11 +254,7 @@ export default class Rcon extends EventEmitter {
 
         logger('RCON', 1, `Failed to connect to: ${this.host}:${this.port}`, err);
 
-        this.handleConnectionRefused(err);
-
-        setTimeout(() => {
-          this.connect().then(resolve).catch(reject);
-        }, this.autoReconnectDelay);
+        reject(err);
       };
 
       this.client.once('connect', onConnect);
@@ -258,15 +262,6 @@ export default class Rcon extends EventEmitter {
 
       this.client.connect(this.port, this.host);
     });
-  }
-
-  handleConnectionRefused(err) {
-    if (err.code === 'ECONNREFUSED') {
-      logger('RCON', 1, `Connection refused. Retrying in ${this.autoReconnectDelay}ms...`);
-    } else {
-      logger('RCON', 1, `Error connecting to RCON: ${err}`);
-      this.emit('RCON_ERROR', err);
-    }
   }
 
   disconnect() {
