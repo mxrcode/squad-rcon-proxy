@@ -16,7 +16,7 @@ const MID_PACKET_ID = 0x01;
 const END_PACKET_ID = 0x02;
 
 export default class Rcon extends EventEmitter {
-  constructor(options = {}) {
+  constructor(options = {}, index) {
     super();
 
     // store config
@@ -57,6 +57,10 @@ export default class Rcon extends EventEmitter {
     this.callbackIds = [];
     this.count = 1;
     this.loggedin = false;
+
+    this.reconnecting = false;
+
+    this.instanceIndex = index;
   }
 
   onPacket(decodedPacket) {
@@ -66,7 +70,7 @@ export default class Rcon extends EventEmitter {
     logger(
       'RCON',
       3,
-      `Processing decoded packet: ${this.decodedPacketToString(decodedPacket)}`
+      `[${this.instanceIndex}] Processing decoded packet: ${this.decodedPacketToString(decodedPacket)}`
     );
 
     switch (decodedPacket.type) {
@@ -90,7 +94,7 @@ export default class Rcon extends EventEmitter {
             logger(
               'RCON',
               1,
-              `Unknown packet ID ${decodedPacket.id} in: ${this.decodedPacketToString(
+              `[${this.instanceIndex}] Unknown packet ID ${decodedPacket.id} in: ${this.decodedPacketToString(
                 decodedPacket
               )}`
             );
@@ -106,7 +110,7 @@ export default class Rcon extends EventEmitter {
         logger(
           'RCON',
           1,
-          `Unknown packet type ${decodedPacket.type} in: ${this.decodedPacketToString(
+          `[${this.instanceIndex}] Unknown packet type ${decodedPacket.type} in: ${this.decodedPacketToString(
             decodedPacket
           )}`
         );
@@ -127,13 +131,13 @@ export default class Rcon extends EventEmitter {
         logger(
           'RCON',
           4,
-          `Waiting for more data... Have: ${this.incomingData.byteLength} Expected: ${packetSize}`
+          `[${this.instanceIndex}] Waiting for more data... Have: ${this.incomingData.byteLength} Expected: ${packetSize}`
         );
         break;
       }
       const packet = this.incomingData.slice(0, packetSize);
 
-      logger('RCON', 4, `Processing packet: ${this.bufToHexString(packet)}`);
+      logger('RCON', 4, `[${this.instanceIndex}] Processing packet: ${this.bufToHexString(packet)}`);
       const decodedPacket = this.decodePacket(packet);
 
       const matchCount = this.callbackIds.filter((d) => d.id === decodedPacket.count);
@@ -161,7 +165,7 @@ export default class Rcon extends EventEmitter {
           // it does so it's the broken packet
           // remove the broken packet from the incoming data
           this.incomingData = this.incomingData.slice(probePacketSize);
-          logger('RCON', 4, `Ignoring some data: ${this.bufToHexString(probeBuf)}`);
+          logger('RCON', 4, `[${this.instanceIndex}] Ignoring some data: ${this.bufToHexString(probeBuf)}`);
           continue;
         }
       }
@@ -185,15 +189,15 @@ export default class Rcon extends EventEmitter {
 
   cleanupState() {
     if (this.incomingData.length > 0) {
-      logger('RCON', 2, `Clearing Buffered Data`);
+      logger('RCON', 2, `[${this.instanceIndex}] Clearing Buffered Data`);
       this.incomingData = Buffer.from([]);
     }
     if (this.incomingResponse.length > 0) {
-      logger('RCON', 2, `Clearing Buffered Response Data`);
+      logger('RCON', 2, `[${this.instanceIndex}] Clearing Buffered Response Data`);
       this.incomingResponse = [];
     }
     if (this.responseCallbackQueue.length > 0) {
-      logger('RCON', 2, `Clearing Pending Callbacks`);
+      logger('RCON', 2, `[${this.instanceIndex}] Clearing Pending Callbacks`);
       while (this.responseCallbackQueue.length > 0) {
         this.responseCallbackQueue.shift()(new Error('RCON DISCONNECTED'));
       }
@@ -204,22 +208,23 @@ export default class Rcon extends EventEmitter {
   onClose(hadError) {
     this.connected = false;
     this.loggedin = false;
-    logger('RCON', 1, `Socket closed ${hadError ? 'with' : 'without'} an error. ${hadError}`);
+    logger('RCON', 1, `[${this.instanceIndex}] Socket closed ${hadError ? 'with' : 'without'} an error. ${hadError}`);
   
     // Cleanup all local state onClose
     this.cleanupState();
   
-    if (this.autoReconnect) {
-      logger('RCON', 1, `Sleeping ${this.autoReconnectDelay}ms before reconnecting.`);
-      setTimeout(() => {
-        this.connect()
-          .then(() => {
-            logger('RCON', 1, 'Reconnected successfully.');
-            // Optionally, you can add logic here to resume operations or re-authenticate.
-          })
-          .catch((err) => {
-            logger('RCON', 1, 'Reconnection attempt failed:', err);
-          });
+    if (this.autoReconnect && !this.reconnecting) {
+      this.reconnecting = true;
+      logger('RCON', 1, `[${this.instanceIndex}] Sleeping ${this.autoReconnectDelay}ms before reconnecting.`);
+      setTimeout(async () => {
+        try {
+          await this.connect();
+          logger('RCON', 1, `[${this.instanceIndex}] Reconnected successfully.`);
+        } catch (err) {
+          logger('RCON', 1, `[${this.instanceIndex}] Reconnection attempt failed: ${err}`);
+        } finally {
+          this.reconnecting = false;
+        }
       }, this.autoReconnectDelay);
     }
   }
@@ -232,13 +237,13 @@ export default class Rcon extends EventEmitter {
   connect() {
     return new Promise((resolve, reject) => {
       this.autoReconnect = true;
-      logger('RCON', 1, `Connecting to: ${this.host}:${this.port}`);
+      logger('RCON', 1, `[${this.instanceIndex}] Connecting to: ${this.host}:${this.port}`);
 
       const onConnect = async () => {
         this.client.removeListener('error', onError);
         this.connected = true;
 
-        logger('RCON', 1, `Connected to: ${this.host}:${this.port}`);
+        logger('RCON', 1, `[${this.instanceIndex}] Connected to: ${this.host}:${this.port}`);
 
         try {
           // connected successfully, now try auth...
@@ -254,7 +259,7 @@ export default class Rcon extends EventEmitter {
       const onError = (err) => {
         this.client.removeListener('connect', onConnect);
 
-        logger('RCON', 1, `Failed to connect to: ${this.host}:${this.port}`, err);
+        logger('RCON', 1, `[${this.instanceIndex}] Failed to connect to: ${this.host}:${this.port}`, err);
 
         reject(err);
       };
@@ -268,12 +273,12 @@ export default class Rcon extends EventEmitter {
 
   disconnect() {
     return new Promise((resolve, reject) => {
-      logger('RCON', 1, `Disconnecting from: ${this.host}:${this.port}`);
+      logger('RCON', 1, `[${this.instanceIndex}] Disconnecting from: ${this.host}:${this.port}`);
 
       const onClose = () => {
         this.client.removeListener('error', onError);
 
-        logger('RCON', 1, `Disconnected from: ${this.host}:${this.port}`);
+        logger('RCON', 1, `[${this.instanceIndex}] Disconnected from: ${this.host}:${this.port}`);
 
         resolve();
       };
@@ -281,7 +286,7 @@ export default class Rcon extends EventEmitter {
       const onError = (err) => {
         this.client.removeListener('close', onClose);
 
-        logger('RCON', 1, `Failed to disconnect from: ${this.host}:${this.port}`, err);
+        logger('RCON', 1, `[${this.instanceIndex}] Failed to disconnect from: ${this.host}:${this.port}`, err);
 
         reject(err);
       };
@@ -319,7 +324,7 @@ export default class Rcon extends EventEmitter {
         return;
       }
 
-      logger('RCON', 2, `Writing packet with type "${type}" and body "${body}".`);
+      logger('RCON', 2, `[${this.instanceIndex}] Writing packet with type "${type}" and body "${body}".`);
 
       const encodedPacket = this.encodePacket(
         type,
@@ -335,7 +340,7 @@ export default class Rcon extends EventEmitter {
       }
 
       const onError = (err) => {
-        logger('RCON', 1, 'Error occurred. Wiping response action queue.', err);
+        logger('RCON', 1, `[${this.instanceIndex}] Error occurred. Wiping response action queue. ${err}`);
         this.responseCallbackQueue = [];
         reject(err);
       };
@@ -344,22 +349,22 @@ export default class Rcon extends EventEmitter {
 
       if (type === SERVERDATA_AUTH) {
         this.callbackIds.push({ id: this.count, cmd: body });
-        logger('RCON', 2, `Writing Auth Packet`);
-        logger('RCON', 4, `Writing packet with type "${type}" and body "${body}".`);
+        logger('RCON', 2, `[${this.instanceIndex}] Writing Auth Packet`);
+        logger('RCON', 4, `[${this.instanceIndex}] Writing packet with type "${type}" and body "${body}".`);
         this.responseCallbackQueue.push(() => {});
         this.responseCallbackQueue.push((decodedPacket) => {
           this.client.removeListener('error', onError);
           if (decodedPacket.id === -1) {
-            logger('RCON', 1, 'Authentication failed.');
+            logger('RCON', 1, `[${this.instanceIndex}] Authentication failed.`);
             reject(new Error('Authentication failed.'));
           } else {
-            logger('RCON', 1, 'Authentication succeeded.');
+            logger('RCON', 1, `[${this.instanceIndex}] Authentication succeeded.`);
             this.loggedin = true;
             resolve();
           }
         });
       } else {
-        logger('RCON', 2, `Writing packet with type "${type}" and body "${body}".`);
+        logger('RCON', 2, `[${this.instanceIndex}] Writing packet with type "${type}" and body "${body}".`);
         this.callbackIds.push({ id: this.count, cmd: body });
         this.responseCallbackQueue.push((response) => {
           this.client.removeListener('error', onError);
@@ -376,7 +381,7 @@ export default class Rcon extends EventEmitter {
             logger(
               'RCON',
               2,
-              `Returning complete response.`
+              `[${this.instanceIndex}] Returning complete response.`
             );
 
             resolve(response);
@@ -390,14 +395,14 @@ export default class Rcon extends EventEmitter {
         this.count = 1;
       }
 
-      logger('RCON', 4, `Sending packet: ${this.bufToHexString(encodedPacket)}`);
+      logger('RCON', 4, `[${this.instanceIndex}] Sending packet: ${this.bufToHexString(encodedPacket)}`);
       this.client.write(encodedPacket);
 
       if (type !== SERVERDATA_AUTH) {
         logger(
           'RCON',
           4,
-          `Sending empty packet: ${this.bufToHexString(encodedEmptyPacket)}`
+          `[${this.instanceIndex}] Sending empty packet: ${this.bufToHexString(encodedEmptyPacket)}`
         );
         this.client.write(encodedEmptyPacket);
         this.count++;

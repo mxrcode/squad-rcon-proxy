@@ -14,18 +14,21 @@ const rconOptions = {
   host: '127.0.0.1',
   port: 21114,
   password: 'RCON_PASSWORD',
+  autoReconnectDelay: 1000
 };
 
-const LOG_LEVEL = 1; // 0 = no logging, 5 = all logs
-const ENABLE_LOGGING = true; // Set to false to disable logging
+const rconPoolSize = 1; // Warning, using more than 1 connection currently will cause a bug.
+
+const logLevel = 1; // 0 =  only essential, 5 = all logs
+const enableLogging = true; // Set to false to disable logging
 
 // Utility function for logging
 function logger(component, level, message) {
-  if (level <= LOG_LEVEL) {
+  if (level <= logLevel) {
     console.log(`[${new Date().toISOString()}] [${level}] [${component}] ${message}`);
   }
 }
-if (ENABLE_LOGGING) {
+if (enableLogging) {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
   
@@ -44,4 +47,4 @@ if (ENABLE_LOGGING) {
   };
 }
 
-export { webOptions, rconOptions, logger };
+export { webOptions, rconOptions, rconPoolSize, logger };
