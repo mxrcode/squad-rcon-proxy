@@ -16,8 +16,6 @@ const rconOptions = {
   password: 'RCON_PASSWORD',
 };
 
-const POOL_SIZE = 10; // Number of connections to keep in the pool
-
 const LOG_LEVEL = 1; // 0 = no logging, 5 = all logs
 const ENABLE_LOGGING = true; // Set to false to disable logging
 
@@ -46,4 +44,4 @@ if (ENABLE_LOGGING) {
   };
 }
 
-export { POOL_SIZE, webOptions, rconOptions, logger };
+export { webOptions, rconOptions, logger };
