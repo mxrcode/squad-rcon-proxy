@@ -4,6 +4,8 @@ import util from 'util';
 
 import { logger } from './config.js';
 
+EventEmitter.defaultMaxListeners = 128; // Increase the default max listeners to prevent memory leaks
+
 const SERVERDATA_EXECCOMMAND = 0x02;
 const SERVERDATA_RESPONSE_VALUE = 0x00;
 const SERVERDATA_AUTH = 0x03;
